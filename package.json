@@ -1,7 +1,7 @@
 {
 	"name": "as3js",
-	"version": "0.1.4",
-	"author": "Greg McLeod <cleod9@gmail.com>",
+	"version": "0.1.4.1",
+	"author": "Greg McLeod <cleod9@gmail.com>; Lion Burger <lion@ps-equity.com>",
 	"description": "AS3 to JS converter for use with ImportJS and OOPS.js.",
 	"bin": {
 		"as3js": "./bin/as3jsc"
@@ -9,7 +9,7 @@
 	"main": "./index.js",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/cleod9/as3js"
+		"url": "https://github.com/lionps/as3js"
 	},
 	"keywords": [
 		"as3",
