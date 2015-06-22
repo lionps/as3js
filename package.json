@@ -1,5 +1,5 @@
 {
-	"name": "as3jsps",
+	"name": "as3js",
 	"version": "0.1.5",
 	"author": "Greg McLeod <cleod9@gmail.com>; Lion Burger <lion@ps-equity.com>",
 	"description": "AS3 to JS converter for use with ImportJS and OOPS.js.",
