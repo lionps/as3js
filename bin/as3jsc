@@ -94,7 +94,7 @@ if(srcPaths.length <= 0) {
 
 		if (separateClasses) {
 			var i = output.lastIndexOf('/');
-			var outputPath = i >= 0 ?output.substring(0, i) :'';
+			var outputPath = i >= 0 ?output.substring(0, i+1) :'';
 
 			for (fullClassName in options.compiledClasses) {
 				var fullClassNameParts = fullClassName.split('.');
