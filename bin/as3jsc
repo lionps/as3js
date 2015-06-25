@@ -107,7 +107,7 @@ if(srcPaths.length <= 0) {
 				}
 				filename += fullClassNameParts[fullClassNameParts.length-1] + ".js";
 
-				console.log("Writing Class " + fullClassName + " to " filename);
+				console.log("Writing Class " + fullClassName + " to " + filename);
 				if (fs.existsSync(filename)) {
 					fs.unlinkSync(filename);
 				}
