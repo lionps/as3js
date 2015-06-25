@@ -143,10 +143,17 @@ package com.mcleodgaming.as3js
 				classes[i].process(classes);
 			}
 
+			if (options.separateClasses) {
+				options.compiledClasses = options.compiledClasses || {};
+			}
 			//Retrieve output
 			for (i in classes)
 			{
-				buffer += classes[i].toString() + '\n';
+				if (options.separateClasses) {
+					options.compiledClasses[classes[i].packageName + "." + classes[i].className)] = classes[i].toString();
+				} else {
+					buffer += classes[i].toString() + '\n';
+				}
 			}
 
 			AS3JS.log("Done.");

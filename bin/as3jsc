@@ -20,6 +20,7 @@ var verbose = false;
 var arg = null;
 var option = null;
 var command = null;
+var separateClasses = false;
 
 //Misc options
 
@@ -46,11 +47,14 @@ for(var i = 0; i < process.argv.length; i++) {
 			option = 'o'; //File output
 		} else if(arg == '-src' || arg == '--sourcepath') {
 			option = 'src'; //Source path(s)
+		} else if(arg == '-sep' || arg == '--separateclasses') {
+			seperateClasses =  true; //Each class in its own file
 		} else if(arg == '-h' || arg == '--help') {
 			//Help text
 			console.log("Options:");
 			console.log("\t[-o|--output]\t\tOutput file");
 			console.log("\t[-src|-sourcepath]\tSource Path(s) (comma-separated)");
+			console.log("\t[-sep|-separateclasses]\tEach class in its own file");
 			console.log("\t[-h|--help]\t\tView Help");
 			console.log("\t[-v|--version]\t\tView Version information");
 			
@@ -71,11 +75,13 @@ if(srcPaths.length <= 0) {
 	console.log("Error, must supply output path (-o)");
 } else {
 	var as3js = new AS3JS();
-	var sourceText = as3js.compile({
+	var options = {
 		srcPaths: srcPaths,
 		silent: silent,
-		verbose: verbose
-	});
+		verbose: verbose,
+		separateClasses: separateClasses
+	};
+	var sourceText = as3js.compile(options);
 	
 	//Remove old output file if it exists
 	if (output)
@@ -85,5 +91,28 @@ if(srcPaths.length <= 0) {
 			fs.unlinkSync(output);
 		}
 		fs.writeFileSync(output || 'output.js', sourceText, "UTF-8", {flags: 'w+'});
+
+		if (separateClasses) {
+			var i = output.lastIndexOf('/');
+			var outputPath = i >= 0 ?output.substring(0, i) :'';
+
+			for (fullClassName in options.compiledClasses) {
+				var fullClassNameParts = fullClassName.split('.');
+				var filename = outputPath;
+				for (var i  = 0; i < fullClassNameParts.length-1; ++i) {
+					filename += fullClassNameParts[i] + '/';
+					if (!fs.existsSync(filename)) {
+						fs.mkdirSync(filename);
+					}
+				}
+				filename += fullClassNameParts[fullClassNameParts.length-1] + ".js";
+
+				console.log("Writing Class " + fullClassName + " to " filename);
+				if (fs.existsSync(filename)) {
+					fs.unlinkSync(filename);
+				}
+				fs.writeFileSync(filename, options.compiledClasses[fullClassName], "UTF-8", {flags: 'w+'});
+			}
+		}
 	}
 }
