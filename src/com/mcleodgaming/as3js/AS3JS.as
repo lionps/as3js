@@ -143,6 +143,8 @@ package com.mcleodgaming.as3js
 				classes[i].process(classes);
 			}
 
+			AS3JS.log("separateClasses="+options.separateClasses);
+
 			if (options.separateClasses) {
 				options.compiledClasses = options.compiledClasses || {};
 			}
