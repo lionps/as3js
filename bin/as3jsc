@@ -92,6 +92,8 @@ if(srcPaths.length <= 0) {
 		}
 		fs.writeFileSync(output || 'output.js', sourceText, "UTF-8", {flags: 'w+'});
 
+			AS3JS.log("separateClasses="+separateClasses);
+
 		if (separateClasses) {
 			var i = output.lastIndexOf('/');
 			var outputPath = i >= 0 ?output.substring(0, i) :'';
