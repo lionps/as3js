@@ -48,7 +48,7 @@ for(var i = 0; i < process.argv.length; i++) {
 		} else if(arg == '-src' || arg == '--sourcepath') {
 			option = 'src'; //Source path(s)
 		} else if(arg == '-sep' || arg == '--separateclasses') {
-			seperateClasses =  true; //Each class in its own file
+			separateClasses =  true; //Each class in its own file
 		} else if(arg == '-h' || arg == '--help') {
 			//Help text
 			console.log("Options:");
