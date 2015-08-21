@@ -85,8 +85,12 @@ ImportJS.pack('com.mcleodgaming.as3js.AS3JS', function(module, exports) {
 			{
 				for (j in pkgLists[i])
 				{
-					AS3JS.log('Analyzing package: ' + pkgLists[i][j].packageName);
-					classes[pkgLists[i][j].packageName] = pkgLists[i][j].parse();
+					var packageName = pkgLists[i][j].packageName;
+					AS3JS.log('Analyzing package: ' + packageName);
+					classes[packageName] = pkgLists[i][j].parse();
+					if (packageName.indexOf("ListCollectionView") >= 0) {
+						AS3JS.log(packageName + "=" + classes[packageName]);
+					}
 					AS3JS.debug(classes[pkgLists[i][j].packageName]);
 				}
 			}
@@ -154,10 +158,17 @@ ImportJS.pack('com.mcleodgaming.as3js.AS3JS', function(module, exports) {
 				classes[i].process(classes);
 			}
 
+			if (options.separateClasses) {
+				options.compiledClasses = options.compiledClasses || {};
+			}
 			//Retrieve output
 			for (i in classes)
 			{
-				buffer += classes[i].toString() + '\n';
+				if (options.separateClasses) {
+					options.compiledClasses[classes[i].packageName + "." + classes[i].className] = classes[i].toString();
+				} else {
+					buffer += classes[i].toString() + '\n';
+				}
 			}
 
 			AS3JS.log("Done.");
@@ -843,7 +854,8 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Class', function(module, exports
 				tmpArr = [];
 				for (i in this.imports)
 				{
-					if (this.imports[i].indexOf('flash.') < 0 && this.parent != this.imports[i].substr(this.imports[i].lastIndexOf('.') + 1) && this.packageName + '.' + this.className != this.imports[i]) //Ignore flash imports
+//					if (this.imports[i].indexOf('flash.') < 0 && this.parent != this.imports[i].substr(this.imports[i].lastIndexOf('.') + 1) && this.packageName + '.' + this.className != this.imports[i]) //Ignore flash imports
+					if (this.parent != this.imports[i].substr(this.imports[i].lastIndexOf('.') + 1) && this.packageName + '.' + this.className != this.imports[i]) //Ignore flash imports
 					{
 						tmpArr.push(this.imports[i].substr(this.imports[i].lastIndexOf('.') + 1)); //<-This will return characters after the final '.', or the entire tring
 					}
@@ -859,7 +871,8 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Class', function(module, exports
 			var injectedText = "";
 			for (i in this.imports)
 			{
-				if (this.imports[i].indexOf('flash.') < 0 && this.packageName + '.' + this.className != this.imports[i]) //Ignore flash imports
+//				if (this.imports[i].indexOf('flash.') < 0 && this.packageName + '.' + this.className != this.imports[i]) //Ignore flash imports
+				if (this.packageName + '.' + this.className != this.imports[i]) //Ignore flash imports
 				{
 					injectedText += "\t\t" + this.imports[i].substr(this.imports[i].lastIndexOf('.') + 1) + " = this.import('" + this.imports[i] + "');\n";
 				}
@@ -872,6 +885,37 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Class', function(module, exports
 					injectedText += AS3Parser.cleanup('\t\t' + this.className + '.' + this.staticMembers[i].name + ' = ' + this.staticMembers[i].value + ";\n");
 				}
 			}
+/*
+			var properties = {};
+			for (i in this.getters) {
+				var getter = this.getters[i];
+				properties[getter.name] = { getter: true };
+			}
+			for (i in this.setters) {
+				var setter = this.setters[i];
+				if (!properties[setter.name]) {
+					properties[setter.name] = {};
+				}
+				properties[setter.name].setter = true;
+			}
+			for (propertyName in properties) {
+				var propertyInfo = properties[propertyName];
+
+				injectedText += "\t\tObject.defineProperty("+this.className+".prototype, '"+propertyName+"', { ";
+				if (propertyInfo.getter) {
+					injectedText += "get: "+this.className+".prototype.get_"+propertyName;
+				}
+				if (propertyInfo.setter) {
+					if (propertyInfo.getter) {
+						injectedText += ", ";
+					}
+					injectedText += "set: "+this.className+".prototype.set_"+propertyName;
+				}
+				injectedText += " });\n";
+			}*/
+//			if ((this.getters.length + this.setters.length) > 0) {
+				injectedText += "\t\tAS3JSUtils.discoverProperties("+this.className+", '"+this.packageName+"', '"+this.className+"');\n";
+//			}
 			
 			if (injectedText.length > 0)
 			{
@@ -1077,30 +1121,61 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 					tokenBuffer = (tokenBuffer) ? tokenBuffer + c : c; //Create new token buffer if needed, otherwise append
 				} else if (!innerState && AS3Parser.checkForCommentOpen(src.substr(index, 2)) && !tokenBuffer)
 				{
-					tokenBuffer = null;
-					AS3JS.debug("Entering comment...");
-					innerState = AS3Parser.checkForCommentOpen(src.substr(index, 2));
-					extraBuffer += src.substr(index, 2);
-					index += 2; //Skip next index
-					//Loop until we break out of comment
-					for (; index < src.length; index++)
+					var isSpecialComment = (src.substr(index+2, 2) == "!-");
+
+					if (isSpecialComment)
 					{
-						if (AS3Parser.checkForCommentClose(innerState, src.substr(index, 2)))
+						AS3JS.debug("Entering SPEICAL comment..." + src.substr(index, 20));
+
+						index += 4;
+						extraBuffer += "/*";
+
+						var commentCloseIndex = src.indexOf("//--", index);
+						extraBuffer += src.substring(index, commentCloseIndex);
+						extraBuffer += "*/";
+
+						index = commentCloseIndex + 4;
+					}
+					else
+					{
+						var isSpecialAntiComment = (src.substr(index+2, 2) == "=>");
+
+						tokenBuffer = null;
+						AS3JS.debug("Entering comment..." + src.substr(index, 20));
+						innerState = AS3Parser.checkForCommentOpen(src.substr(index, 2));
+						if (!isSpecialAntiComment)
 						{
-							if (innerState == AS3ParseState.COMMENT_MULTILINE)
+							extraBuffer += src.substr(index, 2);
+						}
+						else
+						{
+							index += 2;
+						}
+						index += 2; //Skip next index
+
+						//Loop until we break out of comment
+						for (; index < src.length; index++)
+						{
+							if (AS3Parser.checkForCommentClose(innerState, src.substr(index, 2)))
 							{
-								extraBuffer += src.substr(index, 2);
-								index++; //Skip next token
+								if (innerState == AS3ParseState.COMMENT_MULTILINE)
+								{
+									if (!isSpecialAntiComment)
+									{
+										extraBuffer += src.substr(index, 2);
+									}
+									index++; //Skip next token
+								} else
+								{
+									extraBuffer += src.charAt(index);
+								}
+								innerState = null; //Return to previous state
+								AS3JS.debug("Exiting comment...");
+								break;
 							} else
 							{
 								extraBuffer += src.charAt(index);
 							}
-							innerState = null; //Return to previous state
-							AS3JS.debug("Exiting comment...");
-							break;
-						} else
-						{
-							extraBuffer += src.charAt(index);
 						}
 					}
 				}  else if (!innerState && AS3Parser.checkForStringOpen(src.charAt(index)) && !tokenBuffer)
@@ -1212,7 +1287,8 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 				throw new Error("Error, no starting '" + opening  + "' found for method body while parsing " + AS3Parser.PREVIOUS_BLOCK);
 			} else if (count > 0)
 			{
-				throw new Error("Error, no closing '" + closing  + "' found for method body while parsing " + AS3Parser.PREVIOUS_BLOCK);
+				throw new Error("Error, no closing '" + closing  + "' found for method body while parsing " + AS3Parser.PREVIOUS_BLOCK)
+					+ " Code: " + text.substring(start, 100);
 			} else if (count < 0)
 			{
 				throw new Error("Error, malformed enclosing '" + opening + closing + " body while parsing " + AS3Parser.PREVIOUS_BLOCK);
@@ -1451,7 +1527,7 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 							if (cls.retrieveField(currToken.token, tmpStatic) && cls.className != currToken.token && !tmpMember && !(prevToken && prevToken.token === "var"))
 							{
 								tmpMember = cls.retrieveField(currToken.token, tmpStatic); //<-Reconciles the type of the current variable
-								if (tmpMember && (tmpMember.subType == 'get' || tmpMember.subType == 'set'))
+								/*if (tmpMember && (tmpMember.subType == 'get' || tmpMember.subType == 'set'))
 								{
 									tmpPeek = AS3Parser.lookAhead(fnText, index);
 									if (tmpPeek.token)
@@ -1479,6 +1555,7 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 											result += objBuffer + ' - 1';
 										} else
 										{
+											AS3JS.debug('Parsing into ' + tmpPeek.extracted + '...');
 											tmpParse = AS3Parser.parseFunc(cls, tmpPeek.extracted, stack); //Recurse into the assignment to parse vars
 											if (tmpPeek.token == '=')
 											{
@@ -1502,7 +1579,7 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 											result += 'this.get_' + currToken.token + '()';
 										}
 									}
-								} else
+								} else*/
 								{
 									if (tmpStatic)
 									{
@@ -1523,6 +1600,9 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 									result += currToken.token;
 								} else
 								{
+									if (currToken.token == "as") {
+										currToken.token = "#CAST#";
+									} 
 									objBuffer += (cls.retrieveField(currToken.token, false) && !tmpMember && !(prevToken && prevToken.token === "var")) ? 'this.' + currToken.token : currToken.token;
 									result += (cls.retrieveField(currToken.token, false) && !tmpMember && !(prevToken && prevToken.token === "var")) ? 'this.' + currToken.token : currToken.token;
 								}
@@ -1584,7 +1664,7 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 								{
 									//This means we are coming from a typed variable
 									tmpField = tmpClass.retrieveField(currToken.token, tmpStatic);
-									if (tmpField)
+									/*if (tmpField)
 									{
 										//console.log("parsing: " + tmpField.name + ":" + tmpField.type)
 										//We found a field that matched this value within the class
@@ -1633,7 +1713,7 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 											objBuffer += '.' + currToken.token;
 											result += currToken.token;
 										}
-									} else
+									} else*/
 									{
 										objBuffer += '.' + currToken.token;
 										result += currToken.token;
@@ -1731,7 +1811,16 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 			//Take care of function binding
 			
 			//Now cleanup variable types
-			text = text.replace(/([^0-9a-zA-Z_$.])var(\s*[a-zA-Z_$*][0-9a-zA-Z_$.<>]*)\s*:\s*([a-zA-Z_$*][0-9a-zA-Z_$.<>]*)/g, "$1var$2");
+			text = text.replace(/([^0-9a-zA-Z_$\.])var(\s*[a-zA-Z_$*][0-9a-zA-Z_$.<>]*)\s*:\s*([a-zA-Z_$*][0-9a-zA-Z_$.<>]*)/g, "$1var $2");
+//			text = text.replace(/for\s*each\s*\(/g, "for (");
+			text = text.replace(/([\t ]*)for\s+each\s*\(\s*var\s+(\w+)\s+in\s+([\w\.\(\)\[\]\"\']+)\)(\s*)\{/g, "$1for (var key_$2 in $3)$4{\n$1\tvar $2 = $3[key_$2];");
+			text = text.replace(/([\t ]*)for\s+each\s*\(\s*(\w+)\s+in\s+([\w\.\(\)\[\]\"\']+)\)(\s*)\{/g, "$1for (var key_$2 in $3)$4{\n$1\t$2 = $3[key_$2];");
+			text = text.replace(/([\t ]*)for\s+each\s*\(\s*var\s+(\w+)\s+in\s+([\w\.\(\)\[\]\"\']+)\)\s*(.*);/g, "$1for (var key_$2 in $3) {\n$1\tvar $2 = $3[key_$2];\n$1$4;\n$1}");
+			text = text.replace(/([\t ]*)for\s+each\s*\(\s*(\w+)\s+in\s+([\w\.\(\)\[\]\"\']+)\)\s*(.*);/g, "$1for (var key_$2 in $3) {\n$1\t$2 = $3[key_$2];\n$1$4;\n$1}");
+			text = text.replace(/\s*#CAST#\s*([a-zA-Z_$*][0-9a-zA-Z_$.<>]*)/g, "");
+			text = text.replace(/(catch\s*\(\s*[a-zA-Z_$*][0-9a-zA-Z_$.<>]*)\s*:\s*([a-zA-Z_$*][0-9a-zA-Z_$.<>]*)/g, "$1");
+			text = text.replace(/([a-zA-Z_$*][0-9a-zA-Z_$.<>\]\[\(\)]*)\sis\s([a-zA-Z_$*][0-9a-zA-Z_$.<>]*)/g, "$1 instanceof $2");
+			text = text.replace(/\.@([0-9a-zA-Z_]+)/g, ".attr['$1']");
 			
 			return text;
 		}
@@ -1928,7 +2017,7 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 					{
 						//Use all characters after self symbol to set value
 						index = currToken.index;
-						tmpArr = AS3Parser.extractUpTo(src, index, /[;\r\n]/g);
+						tmpArr = AS3Parser.extractUpTo(src, index, /;/g);
 						//Store value
 						currMember.value = tmpArr[0].trim();
 						index =  tmpArr[1];
@@ -2114,7 +2203,9 @@ ImportJS.pack('com.mcleodgaming.as3js.parser.AS3Parser', function(module, export
 			
 			if (!classDefinition.className)
 			{
-				throw new Error("Error, no class provided for package: " + this.packageName);
+//				throw new Error("Error, no class provided for package: " + this.packageName);
+				AS3JS.log("Error, no class provided for package: " + this.packageName);
+				classDefinition.className = "_internal_";
 			}
 			return classDefinition;
 		}
